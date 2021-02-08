@@ -28,7 +28,7 @@ Evaluation:
 - An evaluation is triggered wherever all the brackets are paired;
 - A non-quoted atom is always evaluated, except `t`, `()` and integers;
 - For a list, the first element is evaluated if it is not atomic, then the whole list is evaluated. First element must evaluate to either a predefined function mentioned above or a lambda;
-- A function call is done by first (1) evaluates all arguments (2) replacing all the occurences of arguments in the body (3) evaluating the body. Nested lambda cannot have same variable names as they will be replaced during the evaluation of the outer lambda;
+- A function call is done by (1) evaluates all arguments (2) replacing all the occurences of arguments in the body (3) evaluating the body. Nested lambda cannot have same variable names as they will be replaced during the evaluation of the outer lambda;
 - A macro is like a closure except (1) the arguments are not evaluated before substitution and (2) no additional local scope is created during the evaluation;
 - Keywords cannot be used as variable or function/macro arguments;
 - Note there is no type system. Everything is either a string or a list.

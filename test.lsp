@@ -58,10 +58,7 @@
 (let passed_test 1)
 (defmacro test-assert (value) (do 
     (if value 
-        (do 
-            (print (concatenate 'test total_test 'passed))
-            (let passed_test (+ passed_test 1))
-        )
+        (let passed_test (+ passed_test 1))
         (print (concatenate 'test total_test 'failed))
     )
     (let total_test (+ total_test 1))) 
@@ -74,7 +71,7 @@
 (test-assert (eq (concatenate 'a) 'a))       
 (test-assert (eq (+ 1 1) 2))         
 (test-assert (eq (- 5 (* 2 (+ 1 1))) 1))     
-(test-assert (eq (do (+ 1 2) (+ 3 4)) ()))   
+(test-assert (eq (do (+ 1 2) (+ 3 4)) 7))   
 (test-assert (equal (list (+ 1 2) (+ 3 4)) '(3 7)))  
 
 ; Prelude
@@ -98,6 +95,13 @@
 (test-assert (!= '(a b) '((a b)))) 
 (test-assert (!= 'a '(a))) 
 
+(test-assert (eq (length '(a b c)) 3))
+(test-assert (eq (length '()) 0))
+(test-assert (equal (sublist '(a b c d e) 1 4) '(b c d)))
+(test-assert (equal (sublist '(a b c d e) 0 4) '(a b c d)))
+(test-assert (equal (sublist '(a b c d e) 4 5) '(e)))
+(test-assert (equal (sublist '(a b c d e) 4 4) '()))
+
 (test-assert (eq (cadr '(a b c)) 'b)) 
 (test-assert (eq (caddr '(a b c)) 'c)) 
 (test-assert (equal (cdar '((a b c) b c)) '(b c))) 
@@ -108,13 +112,25 @@
 (test-assert (equal (append '(a b) '()) '(a b) ))
 (test-assert (equal (append '() '()) '() ))
 
+(test-assert (equal (member 'b '(a b c)) '(b c)))
+(test-assert (equal (member 'd '(a b c)) '()))
+(test-assert (equal (filter (lambda (x) (> 'x 2)) '(3 5 1 4 2)) '(3 5 4) ))
+
+(test-assert (equal (map (lambda (x) (+ 'x 1)) '(1 2 3) ) '(2 3 4) ))
+(test-assert (equal (map (lambda (x) (+ 'x 1)) '() ) '() ))
+
+(test-assert (equal (fold-left '+ 0 '(1 2 3) ) 6 ))
+(test-assert (equal (fold-right '+ 0 '(1 2 3) ) 6 ))
+(test-assert (equal (reverse '(1 2 3) ) '(3 2 1) ))
+(test-assert (equal (reverse '() ) '() ))
+
 (test-assert (equal (zip '(a b) '(c d)) '((a c) (b d)) ))
 (test-assert (equal (zip '(a) '(c)) '((a c)) ))
 (test-assert (equal (zip '() '()) '() ))
 
-
 (let my-dict (zip '(1 2 3) '(a b c)))
 (test-assert (equal (assoc 1 my-dict) 'a))
+(test-assert (equal (assoc 4 my-dict) '()))
 
 (if (eq passed_test total_test)
     (print (concatenate 'all 'tests 'are 'successful))

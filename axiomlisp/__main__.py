@@ -10,7 +10,6 @@ class LispError(RuntimeError):
 
 Closure = namedtuple('Closure', ('args', 'expression', 'name'))
 Macro = namedtuple('Macro', ('args', 'expression', 'name'))
-Argument = namedtuple('Argument', ('stackid', 'argid'))
 
 def main_loop():
     while True:
@@ -77,13 +76,16 @@ def parse(tokens, single_tree=True):
         return stack
 
 def is_atom_or_empty(tree):
-    return not isinstance(tree, list) or len(tree) == 0
+    return not isinstance(tree, (list, Macro, Closure)) or len(tree) == 0
 
 def is_list(tree):
     return isinstance(tree, list)
 
 def is_number(tree):
-    return isinstance(tree, str) and tree.isdigit()
+    return isinstance(tree, str) and re.fullmatch(r'\-?[\d]+', tree)
+
+def is_bool(tree):
+    return tree == [] or tree == 't'
 
 def to_int(tree):
     try:
@@ -106,8 +108,6 @@ def assert_varname(a):
      "Invalid variable name %s" % a)
 
 def find_variable(tree, var_stack):
-    if is_number(tree) or tree == 't':
-        return tree
     for a in reversed(var_stack):   # find variable
         if tree in a:
             return a[tree]
@@ -117,19 +117,18 @@ def find_variable(tree, var_stack):
 def execute(tree, var_stack=[], lvalue='#closure'):
 
     if is_atom_or_empty(tree):
-        return find_variable(tree, var_stack) if not is_number(tree) and tree != [] else tree
+        return find_variable(tree, var_stack) if not is_number(tree) and not is_bool(tree) else tree
 
     my_execute = lambda x: execute(x, var_stack=var_stack, lvalue='#closure')
     if is_atom_or_empty(tree[0]):
-        command = find_variable(tree[0], var_stack) if tree[0] not in keywords and tree[0] != [] else tree[0]
+        command = find_variable(tree[0], var_stack) if tree[0] not in keywords else tree[0]
     else:
         command = my_execute(tree[0])
 
     if isinstance(command, Closure):
         assert_args(command.name, tree, len(command.args))
-        myargs = [my_execute(a) for a in tree[1:]]
         try:
-            return execute(replace_tree(command.expression, dict(zip(range(len(command.args)), myargs))), var_stack + [{}])
+            return execute(replace_tree(command.expression, dict(zip(range(len(command.args)), map(my_execute, tree[1:])))), var_stack + [{}])
         except LispError:
             print('In function %s' % str_tree(command), file=sys.stderr)
             raise
@@ -139,7 +138,7 @@ def execute(tree, var_stack=[], lvalue='#closure'):
         try:
             return execute(r, var_stack)
         except LispError:
-            print('In macro %s expands to %s' % (str_tree(command), str_tree(r)), file=sys.stderr)
+            print('In macro %s' % str_tree(command), file=sys.stderr)
             raise
 
     elif command == 'quote':
@@ -183,7 +182,7 @@ def execute(tree, var_stack=[], lvalue='#closure'):
         for a in tree[1]:
             assert_varname(a)
         mapping = dict(zip(tree[1], range(len(tree[1])))) # arg => numerical representation
-        return Closure(tree[1], replace_tree(tree[2], mapping), lvalue)
+        return Closure(tree[1], replace_tree(tree[2], mapping, var_stack[1:]), lvalue)
     elif command == 'macro':
         assert_args(command, tree, 2)
         for a in tree[1]:
@@ -210,9 +209,10 @@ def execute(tree, var_stack=[], lvalue='#closure'):
         my_assert(len(tree) >= 2, 'concatenate requires at least 1 arg')
         return ' '.join(map(lambda x:str_tree(my_execute(x)), tree[1:]))
     elif command == 'do':
+        r = []
         for t in tree[1:]:
-            my_execute(t)
-        return []
+            r = my_execute(t)
+        return r
     elif command == 'list':
         return list(map(my_execute, tree[1:]))
     elif command == '+':
@@ -233,19 +233,30 @@ def execute(tree, var_stack=[], lvalue='#closure'):
     else:
         raise LispError('Cannot understood: %s' % str_tree(tree))
 
-def replace_tree(tree, mapping:dict):
-    """ replace recursively according to mapping."""
+def replace_tree(tree, mapping:dict, var_stack=None):
+    """ replace recursively according to mapping. If var_stack is given, will also replace
+    according to var_stack as a list of dict.
+    """
     
     if isinstance(tree, list):
-        return [replace_tree(t, mapping) for t in tree]
+        return [replace_tree(t, mapping, var_stack) for t in tree]
     elif isinstance(tree, (Closure, Macro)):
         return tree
-    else:
+    elif is_number(tree) or is_bool(tree):
+        return tree
+    elif not var_stack:
         return mapping.get(tree, tree)
+    else:
+        if tree in mapping:
+            return mapping[tree]
+        for s in reversed(var_stack):
+            if tree in s:
+                return s[tree]
+        return tree
 
 def str_tree(tree):
     if isinstance(tree, list):
-        return '(' + ' '.join((str_tree(a) for a in tree)) + ')'
+        return '(' + ' '.join(map(str_tree, tree)) + ')'
     elif isinstance(tree, (Closure, Macro)):
         return '%s (nargs=%d)' % (tree.name, len(tree.args))
     else:
